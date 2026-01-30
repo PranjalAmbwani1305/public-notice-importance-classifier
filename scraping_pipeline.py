@@ -7,7 +7,7 @@ import cv2
 # ===============================
 # CONFIGURATION
 # ===============================
-BASE_URL = "https://example.gov.in/notices"  # CHANGE THIS
+BASE_URL = "ttps://www.gujaratsamachar.com/"  # CHANGE THIS
 PDF_DIR = "scraped_pdfs"
 IMG_DIR = "notice_images"
 DATASET_DIR = "dataset"
