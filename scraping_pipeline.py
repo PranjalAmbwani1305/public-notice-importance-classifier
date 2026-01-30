@@ -1,117 +1,52 @@
-import streamlit as st
-import tensorflow as tf
-import numpy as np
-import cv2
-from PIL import Image
+import os
 import requests
 from bs4 import BeautifulSoup
-from pdf2image import convert_from_bytes
-import io
+from pdf2image import convert_from_path
 
-# ===============================
-# CONFIG
-# ===============================
-IMG_SIZE = 224
-CLASSES = ["Critical", "Important", "Informational", "Low Priority"]
+BASE_URLS = [
+    "https://www.bbc.com/news",
+    "https://indianexpress.com/section/india/"
+]
 
-st.set_page_config(
-    page_title="Public Notice CNN Classifier",
-    page_icon="📰",
-    layout="wide"
-)
+PDF_DIR = "scraped_pdfs"
+IMG_DIR = "scraped_images"
 
-st.title("📰 Public Notice Importance Classification using CNN")
-st.write("CNN is applied in **both PDF and Web Scraping options**.")
+os.makedirs(PDF_DIR, exist_ok=True)
+os.makedirs(IMG_DIR, exist_ok=True)
 
-# ===============================
-# LOAD CNN MODEL
-# ===============================
-@st.cache_resource
-def load_model():
-    return tf.keras.models.load_model("model/notice_cnn.h5")
-
-try:
-    model = load_model()
-    st.success("✅ CNN model loaded")
-except Exception as e:
-    st.error("❌ Failed to load CNN model")
-    st.exception(e)
-    st.stop()
-
-# ===============================
-# PREPROCESS IMAGE FOR CNN
-# ===============================
-def preprocess(img):
-    img = np.array(img)
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-    img = img / 255.0
-    img = np.expand_dims(img, axis=0)
-    return img
-
-# ===============================
-# INPUT METHOD
-# ===============================
-option = st.radio(
-    "Select Input Method",
-    ["📄 PDF Upload", "🌐 Web Scraping"],
-    horizontal=True
-)
-
-# ==================================================
-# OPTION 1: PDF → IMAGE → CNN
-# ==================================================
-if option == "📄 PDF Upload":
-    st.subheader("📄 Upload Public Notice PDF")
-
-    uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
-
-    if uploaded_pdf:
-        with st.spinner("Converting PDF to images..."):
-            images = convert_from_bytes(uploaded_pdf.read(), dpi=200)
-
-        st.success(f"{len(images)} page(s) extracted")
-
-        for i, img in enumerate(images):
-            st.image(img, caption=f"Page {i+1}", use_column_width=True)
-
-            if st.button(f"Classify Page {i+1}"):
-                x = preprocess(img)
-                preds = model.predict(x)[0]
-                idx = np.argmax(preds)
-
-                st.success(f"📌 Importance: {CLASSES[idx]}")
-                st.write(f"Confidence: {preds[idx]*100:.2f}%")
-
-# ==================================================
-# OPTION 2: WEB PAGE → IMAGE → CNN
-# ==================================================
-if option == "🌐 Web Scraping":
-    st.subheader("🌐 Web Scraping (Public Notice Page)")
-
-    url = st.text_input(
-        "Enter News / Public Notice URL",
-        "https://www.bbc.com/news"
-    )
-
-    if st.button("Fetch & Classify Page"):
+def scrape_and_download():
+    for base_url in BASE_URLS:
+        print(f"Scraping: {base_url}")
         try:
-            with st.spinner("Fetching webpage..."):
-                response = requests.get(url, timeout=10)
-                soup = BeautifulSoup(response.text, "html.parser")
+            r = requests.get(base_url, timeout=10)
+            soup = BeautifulSoup(r.text, "html.parser")
 
-                # Convert webpage text to image (visual proxy)
-                text = " ".join(p.get_text() for p in soup.find_all("p")[:20])
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
+                if href.endswith(".pdf"):
+                    if not href.startswith("http"):
+                        href = base_url + href
+                    pdf_name = href.split("/")[-1]
+                    pdf_path = os.path.join(PDF_DIR, pdf_name)
 
-                img = Image.new("RGB", (900, 600), "white")
-                st.image(img, caption="Rendered Web Page Image")
-
-                x = preprocess(img)
-                preds = model.predict(x)[0]
-                idx = np.argmax(preds)
-
-                st.success(f"📌 Importance: {CLASSES[idx]}")
-                st.write(f"Confidence: {preds[idx]*100:.2f}%")
-
+                    pdf_data = requests.get(href)
+                    with open(pdf_path, "wb") as f:
+                        f.write(pdf_data.content)
+                    print(f"Downloaded {pdf_name}")
         except Exception as e:
-            st.error("Failed to process webpage")
-            st.exception(e)
+            print("Error:", e)
+
+def pdf_to_images():
+    for pdf in os.listdir(PDF_DIR):
+        if pdf.endswith(".pdf"):
+            pages = convert_from_path(os.path.join(PDF_DIR, pdf), dpi=200)
+            for i, page in enumerate(pages):
+                img_path = os.path.join(
+                    IMG_DIR, f"{pdf[:-4]}_page_{i}.jpg"
+                )
+                page.save(img_path, "JPEG")
+                print("Saved", img_path)
+
+if __name__ == "__main__":
+    scrape_and_download()
+    pdf_to_images()
