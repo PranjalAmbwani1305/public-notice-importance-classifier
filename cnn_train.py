@@ -57,4 +57,4 @@ model.compile(
 model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS)
 
 model.save("model/notice_cnn.h5")
-print("✅ REAL CNN model trained & saved")
+print("✅ CNN MODEL SAVED → model/notice_cnn.h5")
