@@ -7,6 +7,7 @@ import os
 
 IMG_SIZE = 224
 BATCH_SIZE = 16
+EPOCHS = 10
 NUM_CLASSES = 4
 
 os.makedirs("model", exist_ok=True)
@@ -53,7 +54,7 @@ model.compile(
     metrics=["accuracy"]
 )
 
-model.fit(train_gen, validation_data=val_gen, epochs=10)
+model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS)
 
 model.save("model/notice_cnn.h5")
-print("✅ CNN model saved at model/notice_cnn.h5")
+print("✅ REAL CNN model trained & saved")
